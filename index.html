@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Temperature Safety Socket (Demo)</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sakura: {
+                            primary: '#ff7aa8',
+                            soft: '#ffd1dc',
+                            accent: '#ffb7c5',
+                            bg: '#0f0f14',
+                            card: '#1a1a22',
+                            dark: '#14141b'
+                        },
+                        status: {
+                            normal: '#10b981', // green
+                            warning: '#f59e0b', // yellow
+                            danger: '#ef4444'   // red
+                        }
+                    },
+                    fontFamily: {
+                        poppins: ['Poppins', 'sans-serif'],
+                        inter: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f0f14, #1a1a22);
+            color: #ffd1dc;
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        h1, h2, h3, h4, h5, h6, .font-heading {
+            font-family: 'Poppins', sans-serif;
+        }
+
+        /* Glassmorphism / Card Styling */
+        .glass-card {
+            background: rgba(26, 26, 34, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 183, 197, 0.1);
+            border-radius: 1rem;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f0f14; }
+        ::-webkit-scrollbar-thumb { background: #ff7aa8; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ffb7c5; }
+
+        /* Sakura Petal Animation */
+        .petals-container {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .petal {
+            position: absolute;
+            background-color: #ffb7c5;
+            border-radius: 150% 0 150% 0;
+            opacity: 0.7;
+            box-shadow: 0 0 10px rgba(255, 183, 197, 0.5);
+            animation: fall linear infinite;
+        }
+        @keyframes fall {
+            0% { top: -10%; transform: translateX(0) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.7; }
+            90% { opacity: 0.7; }
+            100% { top: 110%; transform: translateX(100px) rotate(360deg); opacity: 0; }
+        }
+
+        /* Warning Pulse */
+        @keyframes pulse-danger {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 20px 5px rgba(239, 68, 68, 0.7); }
+        }
+        .danger-pulse {
+            animation: pulse-danger 1.5s infinite;
+            border: 1px solid #ef4444 !important;
+        }
+        
+        /* Interactive Elements */
+        .content-wrapper { position: relative; z-index: 10; }
+
+        .btn-control {
+            transition: all 0.3s ease;
+        }
+        .btn-control.active-normal { background: rgba(16, 185, 129, 0.2); border-color: #10b981; color: #10b981; }
+        .btn-control.active-warning { background: rgba(245, 158, 11, 0.2); border-color: #f59e0b; color: #f59e0b; }
+        .btn-control.active-danger { background: rgba(239, 68, 68, 0.2); border-color: #ef4444; color: #ef4444; }
+        .btn-control.active-offline { background: rgba(107, 114, 128, 0.2); border-color: #9ca3af; color: #9ca3af; }
+    </style>
+</head>
+<body class="text-sakura-soft antialiased">
+
+    <!-- Sakura Petals Background -->
+    <div class="petals-container" id="petals"></div>
+
+    <div class="content-wrapper container mx-auto px-4 py-6 max-w-7xl">
+        
+        <!-- Header Section -->
+        <header class="glass-card p-6 mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 rounded-full bg-sakura-primary/20 flex items-center justify-center text-sakura-primary text-2xl">
+                    <i class="fa-solid fa-plug-circle-bolt"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-white font-heading">SMART TEMPERATURE SAFETY SOCKET</h1>
+                    <p class="text-sakura-accent text-sm">Interactive Live Demo Mode</p>
+                </div>
+            </div>
+            <div class="flex flex-col md:flex-row items-center gap-4 text-sm font-medium">
+                <div class="flex items-center gap-2 bg-sakura-dark px-4 py-2 rounded-full border border-sakura-primary/30">
+                    <span class="relative flex h-3 w-3">
+                      <span id="status-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span id="status-dot" class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                    </span>
+                    <span class="text-gray-300">Arduino Status:</span>
+                    <span class="text-green-400 font-bold tracking-wide" id="conn-status">CONNECTED</span>
+                </div>
+                <div class="flex items-center gap-2 bg-sakura-dark px-4 py-2 rounded-full border border-sakura-primary/30 text-gray-300">
+                    <i class="fa-regular fa-clock text-sakura-primary"></i>
+                    <span id="live-clock">00:00:00 AM</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- DEMO SIMULATION CONTROLS -->
+        <div class="glass-card p-6 mb-6 border border-sakura-primary/50 relative overflow-hidden">
+            <div class="absolute top-0 right-0 bg-sakura-primary text-white text-xs font-bold px-3 py-1 rounded-bl-lg">DEMO PANEL</div>
+            <h2 class="text-sm font-semibold uppercase tracking-wider font-heading mb-4 text-white">
+                <i class="fa-solid fa-sliders text-sakura-primary mr-2"></i> Simulate Scenario
+            </h2>
+            <div class="flex flex-wrap gap-4">
+                <button onclick="setScenario('NORMAL')" id="btn-normal" class="btn-control active-normal flex-1 min-w-[150px] border border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-bold cursor-pointer">
+                    <i class="fa-solid fa-leaf"></i> Normal Temp (~28°C)
+                </button>
+                <button onclick="setScenario('WARNING')" id="btn-warning" class="btn-control flex-1 min-w-[150px] border border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-bold cursor-pointer">
+                    <i class="fa-solid fa-fire-flame-simple"></i> Warning (~40°C)
+                </button>
+                <button onclick="setScenario('DANGER')" id="btn-danger" class="btn-control flex-1 min-w-[150px] border border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-bold cursor-pointer">
+                    <i class="fa-solid fa-fire"></i> Danger (>45°C)
+                </button>
+                <button onclick="setScenario('OFFLINE')" id="btn-offline" class="btn-control flex-1 min-w-[150px] border border-gray-600 bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 px-4 rounded-xl flex items-center justify-center gap-2 font-bold cursor-pointer">
+                    <i class="fa-solid fa-link-slash"></i> Disconnect Board
+                </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-3"><i class="fa-solid fa-circle-info mr-1"></i> Data values simulate a physical sensor reading naturally drifting towards the selected scenario.</p>
+        </div>
+
+        <!-- Warning System (Hidden by default) -->
+        <div id="warning-box" class="hidden mb-6 bg-red-900/40 border border-red-500 text-red-100 px-6 py-4 rounded-xl flex flex-col md:flex-row items-center justify-between danger-pulse gap-4">
+            <div class="flex items-center gap-4">
+                <i class="fa-solid fa-triangle-exclamation text-4xl text-red-500 animate-bounce"></i>
+                <div>
+                    <h3 class="text-xl font-bold font-heading text-red-400">⚠ Overheat Detected!</h3>
+                    <p class="text-sm md:text-base">Heat Index exceeded the safety limit. Power supply automatically cut off.</p>
+                </div>
+            </div>
+            <div class="text-right whitespace-nowrap">
+                <span class="block text-xs uppercase tracking-wider text-red-300">Triggered at</span>
+                <span class="font-bold font-mono text-lg" id="warning-time">--:--:--</span>
+            </div>
+        </div>
+
+        <!-- Live Monitoring Panel -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <!-- Temperature Card -->
+            <div class="glass-card p-6 flex flex-col justify-between" id="card-temp">
+                <div class="flex justify-between items-start">
+                    <h2 class="text-gray-400 text-sm font-semibold uppercase tracking-wider font-heading">Live Temperature</h2>
+                    <i class="fa-solid fa-temperature-three-quarters text-sakura-primary text-xl"></i>
+                </div>
+                <div class="mt-4 flex items-end gap-2">
+                    <span class="text-5xl font-bold text-white font-heading" id="val-temp">--.-</span>
+                    <span class="text-2xl text-gray-400 mb-1">°C</span>
+                </div>
+                
+                <div class="mt-2 flex flex-col gap-1 border-t border-gray-700/50 pt-2">
+                    <div class="text-sm text-gray-400 flex justify-between">
+                        <span><i class="fa-solid fa-droplet text-blue-400 mr-1"></i> Humidity:</span>
+                        <span><span id="val-hum" class="font-bold text-white">--</span> %</span>
+                    </div>
+                    <div class="text-sm text-gray-400 flex justify-between">
+                        <span><i class="fa-solid fa-sun text-yellow-400 mr-1"></i> Heat Index:</span>
+                        <span><span id="val-hi" class="font-bold text-white">--</span> °C</span>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-sm" id="temp-trend">Waiting for data...</div>
+            </div>
+
+            <!-- Relay Status Card -->
+            <div class="glass-card p-6 flex flex-col justify-between" id="card-relay">
+                <div class="flex justify-between items-start">
+                    <h2 class="text-gray-400 text-sm font-semibold uppercase tracking-wider font-heading">Power Relay</h2>
+                    <i class="fa-solid fa-power-off text-sakura-primary text-xl"></i>
+                </div>
+                <div class="mt-4 flex items-center justify-between">
+                    <span class="text-4xl font-bold text-white font-heading" id="val-relay">--</span>
+                    <!-- Visual Switch Indicator -->
+                    <div class="relative inline-block w-16 h-8 align-middle select-none transition duration-200 ease-in">
+                        <div id="relay-switch-bg" class="absolute block w-16 h-8 rounded-full bg-gray-600 transition-colors"></div>
+                        <div id="relay-switch-dot" class="absolute block w-8 h-8 rounded-full bg-white border-4 border-gray-600 appearance-none transition-transform duration-300 ease-in-out transform translate-x-0"></div>
+                    </div>
+                </div>
+                <div class="mt-4 text-sm text-gray-400">
+                    Protection: <span id="val-protection" class="font-bold text-sakura-primary">ACTIVE</span>
+                </div>
+            </div>
+
+            <!-- Socket Safety Status -->
+            <div class="glass-card p-6 flex flex-col justify-between" id="card-status">
+                <div class="flex justify-between items-start">
+                    <h2 class="text-gray-400 text-sm font-semibold uppercase tracking-wider font-heading">Socket Safety</h2>
+                    <i class="fa-solid fa-shield-halved text-sakura-primary text-xl"></i>
+                </div>
+                <div class="mt-4">
+                    <span class="text-4xl font-bold font-heading text-status-normal" id="val-status">--</span>
+                </div>
+                <div class="mt-4 text-sm text-gray-400">
+                    System State: <span id="val-action">Monitoring</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Safety Level Panel -->
+        <div class="glass-card p-6 mb-6 flex flex-col items-center justify-center text-center" id="card-safety">
+            <h2 class="text-gray-400 text-sm font-semibold uppercase tracking-wider font-heading mb-3">
+                SYSTEM SAFETY LEVEL
+            </h2>
+            <div id="safety-indicator" class="text-5xl font-bold text-green-400 transition-colors duration-300">
+                🟢 SAFE
+            </div>
+            <p class="text-gray-400 mt-3 text-sm">
+                Real-time environmental safety monitoring
+            </p>
+
+            <!-- THERMAL RISK METER -->
+            <div class="mt-4 w-full max-w-md">
+                <div class="flex justify-between text-xs text-gray-400 mb-1">
+                    <span>Thermal Risk</span>
+                    <span id="risk-label" class="font-bold">LOW</span>
+                </div>
+                <div class="w-full bg-gray-800 rounded-full h-3 overflow-hidden">
+                    <div id="risk-bar" 
+                         class="h-3 bg-green-400 transition-all duration-500"
+                         style="width:30%">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- Temperature Graph -->
+            <div class="glass-card p-6 lg:col-span-2 flex flex-col h-full">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-white font-heading"><i class="fa-solid fa-chart-line mr-2 text-sakura-primary"></i>Real-Time Temp & Humidity Graph</h2>
+                    <span class="text-xs bg-sakura-primary/20 text-sakura-primary px-2 py-1 rounded">Last 60 seconds</span>
+                </div>
+                <div class="w-full relative flex-grow min-h-[320px]">
+                    <canvas id="tempChart"></canvas>
+                </div>
+            </div>
+
+            <!-- System Info & Metrics -->
+            <div class="flex flex-col gap-6">
+                <!-- Metrics -->
+                <div class="glass-card p-6">
+                    <h2 class="text-lg font-semibold text-white font-heading mb-4"><i class="fa-solid fa-chart-pie mr-2 text-sakura-primary"></i>Session Metrics</h2>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center bg-sakura-dark p-3 rounded-lg border border-sakura-primary/10">
+                            <span class="text-sm text-gray-400">Max Temp</span>
+                            <span class="font-bold text-red-400" id="metric-max">-- °C</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-sakura-dark p-3 rounded-lg border border-sakura-primary/10">
+                            <span class="text-sm text-gray-400">Avg Temp</span>
+                            <span class="font-bold text-yellow-400" id="metric-avg">-- °C</span>
+                        </div>
+                        <div class="flex justify-between items-center bg-sakura-dark p-3 rounded-lg border border-sakura-primary/10">
+                            <span class="text-sm text-gray-400">Min Temp</span>
+                            <span class="font-bold text-blue-400" id="metric-min">-- °C</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Info -->
+                <div class="glass-card p-6 flex-grow">
+                    <h2 class="text-lg font-semibold text-white font-heading mb-4"><i class="fa-solid fa-microchip mr-2 text-sakura-primary"></i>System Info</h2>
+                    
+                    <ul class="text-sm space-y-3 text-gray-300">
+                        <li class="flex justify-between border-b border-gray-700 pb-2">
+                            <span class="text-gray-500">Board</span>
+                            <span class="font-mono text-sakura-accent">Arduino UNO (Simulated)</span>
+                        </li>
+                        <li class="flex justify-between border-b border-gray-700 pb-2">
+                            <span class="text-gray-500">Sensor</span>
+                            <span class="font-mono text-sakura-accent">DHT11 Temp/Humidity</span>
+                        </li>
+                        <li class="flex justify-between border-b border-gray-700 pb-2">
+                            <span class="text-gray-500">Sampling Rate</span>
+                            <span class="font-mono text-sakura-accent">1 Second</span>
+                        </li>
+                        <li class="flex justify-between border-b border-gray-700 pb-2">
+                            <span class="text-gray-500">Danger Limit</span>
+                            <span class="font-mono text-red-400 font-bold">≥ 44 °C</span>
+                        </li>
+                        <li class="flex justify-between border-b border-gray-700 pb-2">
+                            <span class="text-gray-500">Protection</span>
+                            <span class="font-mono text-sakura-accent">Relay Auto Cutoff</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Logging Panel -->
+        <div class="glass-card p-6 overflow-hidden">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                <h2 class="text-lg font-semibold text-white font-heading"><i class="fa-solid fa-table-list mr-2 text-sakura-primary"></i>Data Log (Last 20 Readings)</h2>
+                <button onclick="downloadCSV()" class="bg-sakura-primary hover:bg-pink-500 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center gap-2 text-sm shadow-lg shadow-pink-500/30">
+                    <i class="fa-solid fa-download"></i> Download CSV
+                </button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-sakura-dark text-gray-400 text-sm uppercase tracking-wider">
+                            <th class="p-3 rounded-tl-lg">Time</th>
+                            <th class="p-3">Temperature</th>
+                            <th class="p-3">Relay State</th>
+                            <th class="p-3 rounded-tr-lg">System Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-table-body" class="text-sm divide-y divide-gray-800">
+                        <!-- Rows will be populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <footer class="mt-8 text-center text-xs text-gray-500 pb-4">
+            <p>Smart Temperature Controlled Safety Socket • Live Simulation Demo 🌸</p>
+        </footer>
+
+    </div>
+
+    <!-- Custom Modal for Alerts -->
+    <div id="custom-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-sakura-card border border-sakura-primary/30 p-6 rounded-2xl shadow-2xl max-w-sm w-full mx-4 text-center transform scale-95 opacity-0 transition-all duration-300" id="modal-content">
+            <div class="w-16 h-16 rounded-full bg-sakura-primary/20 flex items-center justify-center mx-auto mb-4 text-sakura-primary text-2xl">
+                <i class="fa-solid fa-info-circle"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white font-heading mb-2" id="modal-title">Notice</h3>
+            <p class="text-gray-300 mb-6" id="modal-text">Message goes here.</p>
+            <button onclick="closeModal()" class="bg-sakura-primary hover:bg-pink-500 text-white font-bold py-2 px-6 rounded-lg transition-colors w-full">
+                OK
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // --- MODAL SYSTEM (No Native Alerts) ---
+        function showModal(title, text) {
+            const modal = document.getElementById('custom-modal');
+            const content = document.getElementById('modal-content');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-text').innerText = text;
+            
+            modal.classList.remove('hidden');
+            // Trigger animation
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('custom-modal');
+            const content = document.getElementById('modal-content');
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        // --- SAKURA ANIMATIONS ---
+        function createPetals() {
+            const container = document.getElementById('petals');
+            const petalCount = 30;
+            for (let i = 0; i < petalCount; i++) {
+                let petal = document.createElement('div');
+                petal.classList.add('petal');
+                
+                let size = Math.random() * 10 + 5; 
+                let left = Math.random() * 100; 
+                let duration = Math.random() * 4 + 8; 
+                let delay = Math.random() * 10; 
+                
+                petal.style.width = `${size}px`;
+                petal.style.height = `${size * 1.2}px`;
+                petal.style.left = `${left}vw`;
+                petal.style.animationDuration = `${duration}s`;
+                petal.style.animationDelay = `${delay}s`;
+                
+                container.appendChild(petal);
+            }
+        }
+        createPetals();
+
+        // --- SYSTEM VARIABLES ---
+        const THRESHOLD = 44; 
+        const MAX_LOG_RECORDS = 20;
+        const MAX_GRAPH_POINTS = 60;
+        
+        let lastPrediction = null;
+        let dataHistory = []; 
+        let tableData = [];   
+        
+        let sessionMax = -Infinity;
+        let sessionMin = Infinity;
+        let sessionSum = 0;
+        let sessionCount = 0;
+
+        // --- MOCK DATA GENERATOR (Demo logic) ---
+        let currentScenario = 'NORMAL';
+        let mockTemp = 28.0;
+        let mockHum = 45.0;
+        let isConnected = true;
+
+        function setScenario(scenario) {
+            currentScenario = scenario;
+            isConnected = (scenario !== 'OFFLINE');
+
+            // Reset UI highlights
+            ['normal', 'warning', 'danger', 'offline'].forEach(s => {
+                document.getElementById(`btn-${s}`).classList.remove(`active-${s}`);
+                document.getElementById(`btn-${s}`).classList.add('border-gray-600', 'text-gray-300');
+            });
+
+            // Set active highlight
+            const activeBtn = document.getElementById(`btn-${scenario.toLowerCase()}`);
+            activeBtn.classList.remove('border-gray-600', 'text-gray-300');
+            activeBtn.classList.add(`active-${scenario.toLowerCase()}`);
+
+            // Force immediate graph gap if offline
+            if (!isConnected) fetchAndUpdateData();
+        }
+
+        function generateMockData() {
+            if (!isConnected) {
+                return { connected: false, status: 'OFFLINE' };
+            }
+
+            // Define targets based on scenario
+            let targetTemp = 28, targetHum = 45;
+            if (currentScenario === 'WARNING') { targetTemp = 41; targetHum = 55; }
+            if (currentScenario === 'DANGER') { targetTemp = 48; targetHum = 65; }
+
+            // Random walk towards target (creates smooth, realistic drifting)
+            mockTemp += (targetTemp - mockTemp) * 0.15 + (Math.random() - 0.5) * 1.2;
+            mockHum += (targetHum - mockHum) * 0.1 + (Math.random() - 0.5) * 2.0;
+
+            // Simple mock Heat Index calculation for demo purposes
+            let heatindex = mockTemp + (mockHum > 50 ? (mockHum - 50) * 0.1 : 0);
+
+            // Determine status and relay logic
+            let status = 'NORMAL';
+            let relay = 1;
+
+            if (heatindex >= THRESHOLD) {
+                status = 'DANGER';
+                relay = 0;
+            } else if (heatindex >= 38) {
+                status = 'WARNING';
+            }
+
+            // Generate Timestamp YYYY-MM-DD HH:MM:SS
+            const now = new Date();
+            const pad = n => n.toString().padStart(2, '0');
+            const timestamp = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+
+            return {
+                temperature: mockTemp,
+                humidity: mockHum,
+                heatindex: heatindex,
+                relay: relay,
+                status: status,
+                timestamp: timestamp,
+                connected: true
+            };
+        }
+
+
+        // --- CLOCK ---
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('live-clock').innerText = now.toLocaleTimeString('en-US', { hour12: true });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // --- CHART PLUGINS ---
+        Chart.register({
+            id: 'dangerLine',
+            afterDraw(chart) {
+                const yScale = chart.scales.y;
+                const ctx = chart.ctx;
+                const y = yScale.getPixelForValue(THRESHOLD);
+
+                const tempData = chart.data.datasets[0].data;
+                const currentTemp = tempData.length ? tempData[tempData.length - 1] : 0;
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.moveTo(chart.chartArea.left, y);
+                ctx.lineTo(chart.chartArea.right, y);
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([6,4]);
+
+                if (currentTemp >= (THRESHOLD - 2)) {
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 15;
+                }
+                ctx.stroke();
+
+                ctx.fillStyle = '#ef4444';
+                ctx.font = '12px Inter';
+                ctx.fillText(`Danger Limit (${THRESHOLD}°C)`, chart.chartArea.right - 130, y - 6);
+                ctx.restore();
+            }
+        });
+
+        // --- CHART INITIALIZATION ---
+        const ctx = document.getElementById('tempChart').getContext('2d');
+        const tempChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [], 
+                datasets: [
+                    {
+                        label: 'Temperature °C',
+                        data: [],
+                        borderColor: '#ff7aa8',
+                        backgroundColor: 'rgba(255,122,168,0.2)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#ff7aa8',
+                        pointRadius: 2,
+                        fill: true,
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Humidity %',
+                        data: [],
+                        borderColor: '#a855f7',
+                        backgroundColor: 'rgba(168,85,247,0.1)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#a855f7',
+                        pointRadius: 2,
+                        fill: true,
+                        tension: 0.4,
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Predicted Temp',
+                        data: [],
+                        borderColor: '#f97316',
+                        backgroundColor: 'rgba(249,115,22,0.2)',
+                        borderDash: [6,6],
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true,
+                        tension: 0.4,
+                        yAxisID: 'y'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false, 
+                scales: {
+                    x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
+                    y: {
+                        type: 'linear', display: true, position: 'left',
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#ff7aa8' },
+                        suggestedMin: 20, suggestedMax: 55,
+                        afterBuildTicks: axis => { axis.ticks.push({value: THRESHOLD}); }
+                    },
+                    y1: {
+                        type: 'linear', display: true, position: 'right',
+                        grid: { drawOnChartArea: false }, ticks: { color: '#a855f7' },
+                        suggestedMin: 30, suggestedMax: 90
+                    }
+                },
+                plugins: {
+                    legend: { display: true, labels: { color: '#9ca3af' } },
+                    tooltip: { backgroundColor: 'rgba(26, 26, 34, 0.9)', titleColor: '#ffb7c5', bodyColor: '#fff', borderColor: 'rgba(255, 183, 197, 0.2)', borderWidth: 1 }
+                }
+            }
+        });
+
+        // --- MAIN FETCH & UPDATE LOGIC ---
+        function fetchAndUpdateData() {
+            // Replaced fetch with mock data generator for demo
+            let data = generateMockData();
+            
+            let { temperature, humidity, heatindex, relay, status, timestamp, connected } = data;
+            
+            // New Safety Indicator & Thermal Risk Meter Logic
+            const safetyIndicator = document.getElementById("safety-indicator");
+            const riskBar = document.getElementById("risk-bar");
+            const riskLabel = document.getElementById("risk-label");
+            
+            if (connected === false) {
+                safetyIndicator.innerHTML = "⚪ OFFLINE";
+                safetyIndicator.className = "text-5xl font-bold text-gray-500 transition-colors duration-300";
+                
+                riskBar.style.width = "0%";
+                riskBar.className = "h-3 bg-gray-500 transition-all duration-500";
+                riskLabel.innerText = "OFFLINE";
+                temperature = humidity = heatindex = null; // show gaps in graph
+            } else if(status === "NORMAL") {
+                safetyIndicator.innerHTML = "🟢 SAFE";
+                safetyIndicator.className = "text-5xl font-bold text-green-400 transition-colors duration-300";
+                
+                riskBar.style.width = "30%";
+                riskBar.className = "h-3 bg-green-400 transition-all duration-500";
+                riskLabel.innerText = "LOW";
+            } else if(status === "WARNING") {
+                safetyIndicator.innerHTML = "🟡 WARNING";
+                safetyIndicator.className = "text-5xl font-bold text-yellow-400 transition-colors duration-300";
+                
+                riskBar.style.width = "70%";
+                riskBar.className = "h-3 bg-yellow-400 transition-all duration-500";
+                riskLabel.innerText = "MEDIUM";
+            } else if(status === "DANGER") {
+                safetyIndicator.innerHTML = "🔴 DANGER";
+                safetyIndicator.className = "text-5xl font-bold text-red-500 transition-colors duration-300 animate-pulse";
+                
+                riskBar.style.width = "100%";
+                riskBar.className = "h-3 bg-red-500 transition-all duration-500";
+                riskLabel.innerText = "CRITICAL";
+            }
+
+            if (connected) {
+                document.getElementById('conn-status').innerText = "CONNECTED";
+                document.getElementById('conn-status').classList.remove('text-red-400', 'text-yellow-400', 'text-gray-400');
+                document.getElementById('conn-status').classList.add('text-green-400');
+
+                document.getElementById('status-ping').classList.replace('bg-red-400', 'bg-green-400');
+                document.getElementById('status-ping').classList.replace('bg-yellow-400', 'bg-green-400');
+                document.getElementById('status-ping').classList.replace('bg-gray-400', 'bg-green-400');
+                document.getElementById('status-dot').classList.replace('bg-red-500', 'bg-green-500');
+                document.getElementById('status-dot').classList.replace('bg-yellow-500', 'bg-green-500');
+                document.getElementById('status-dot').classList.replace('bg-gray-500', 'bg-green-500');
+            } else {
+                document.getElementById('conn-status').innerText = "DISCONNECTED";
+                document.getElementById('conn-status').classList.remove('text-green-400', 'text-yellow-400', 'text-red-400');
+                document.getElementById('conn-status').classList.add('text-gray-400');
+                
+                document.getElementById('status-ping').classList.replace('bg-green-400', 'bg-gray-400');
+                document.getElementById('status-ping').classList.replace('bg-red-400', 'bg-gray-400');
+                document.getElementById('status-ping').classList.replace('bg-yellow-400', 'bg-gray-400');
+                document.getElementById('status-dot').classList.replace('bg-green-500', 'bg-gray-500');
+                document.getElementById('status-dot').classList.replace('bg-red-500', 'bg-gray-500');
+                document.getElementById('status-dot').classList.replace('bg-yellow-500', 'bg-gray-500');
+            }
+
+            const timeOnly = timestamp ? timestamp.split(' ')[1] : new Date().toLocaleTimeString('en-US',{hour12:false});
+
+            if (connected) {
+                dataHistory.push(data);
+                tableData.unshift(data); 
+                if (tableData.length > MAX_LOG_RECORDS) tableData.pop();
+            }
+
+            // 1. Update Temperature Card
+            const tempEl = document.getElementById('val-temp');
+            tempEl.innerText = temperature ? temperature.toFixed(1) : "--";
+
+            if (humidity !== undefined && humidity !== null) document.getElementById("val-hum").innerText = humidity.toFixed(1);
+            else document.getElementById("val-hum").innerText = "--";
+            
+            if (heatindex !== undefined && heatindex !== null) document.getElementById("val-hi").innerText = heatindex.toFixed(1);
+            else document.getElementById("val-hi").innerText = "--";
+            
+            let tempColor = 'text-white';
+            if (status === 'WARNING') tempColor = 'text-status-warning';
+            if (status === 'DANGER') tempColor = 'text-status-danger';
+            if (!connected) tempColor = 'text-gray-500';
+            tempEl.className = `text-5xl font-bold font-heading transition-colors ${tempColor}`;
+
+            // Calculate simple trend text
+            if (dataHistory.length > 1 && temperature) {
+                let diff = temperature - dataHistory[dataHistory.length - 2].temperature;
+                let trendText = diff > 0.1 ? `▲ +${diff.toFixed(1)}°C` : diff < -0.1 ? `▼ ${diff.toFixed(1)}°C` : '▶ Stable';
+                let trendColor = diff > 0.1 ? 'text-red-400' : diff < -0.1 ? 'text-blue-400' : 'text-gray-400';
+                document.getElementById('temp-trend').innerHTML = `<span class="${trendColor}">${trendText}</span> since last reading`;
+            } else if (!connected) {
+                document.getElementById('temp-trend').innerHTML = `<span class="text-gray-500">Awaiting Connection...</span>`;
+            }
+
+            // --- OVERHEAT PREDICTION ---
+            if (dataHistory.length >= 10 && connected) {
+                let current = dataHistory[dataHistory.length - 1].temperature;
+                let past = dataHistory[dataHistory.length - 10].temperature;
+
+                if (current !== null && past !== null && current !== undefined && past !== undefined) {
+                    let rate = (current - past) / 10; 
+                    let predicted = current + rate * 20;
+
+                    if (predicted >= THRESHOLD && status !== "DANGER") {
+                        document.getElementById("temp-trend").innerHTML =
+                        `<span class="text-orange-400 font-bold">⚠ Overheat predicted in ~20s</span>`;
+                    }
+                }
+            }
+
+            // 2. Update Relay Card
+            const relayText = !connected ? '--' : (relay === 1 ? 'ON' : 'OFF');
+            document.getElementById('val-relay').innerText = relayText;
+            
+            const relayBg = document.getElementById('relay-switch-bg');
+            const relayDot = document.getElementById('relay-switch-dot');
+            if (relay === 1 && connected) {
+                relayBg.classList.replace('bg-gray-600', 'bg-sakura-primary');
+                relayDot.classList.replace('translate-x-0', 'translate-x-8');
+                relayDot.classList.replace('border-gray-600', 'border-sakura-primary');
+                document.getElementById('val-protection').innerText = "ACTIVE";
+                document.getElementById('val-protection').classList.replace('text-red-500', 'text-sakura-primary');
+                document.getElementById('val-protection').classList.replace('text-gray-500', 'text-sakura-primary');
+            } else {
+                relayBg.classList.replace('bg-sakura-primary', 'bg-gray-600');
+                relayDot.classList.replace('translate-x-8', 'translate-x-0');
+                relayDot.classList.replace('border-sakura-primary', 'border-gray-600');
+                
+                if(!connected) {
+                     document.getElementById('val-protection').innerText = "DISABLED";
+                     document.getElementById('val-protection').className = "font-bold text-gray-500";
+                } else if(status === 'DANGER') {
+                     document.getElementById('val-protection').innerText = "TRIGGERED";
+                     document.getElementById('val-protection').className = "font-bold text-red-500";
+                }
+            }
+
+            // 3. Update Status Card
+            const statusEl = document.getElementById('val-status');
+            statusEl.innerText = status;
+            statusEl.className = `text-4xl font-bold font-heading uppercase ${!connected ? 'text-gray-500' : ''}`;
+            
+            const actionEl = document.getElementById('val-action');
+            if (!connected) actionEl.innerHTML = '<span class="text-gray-500">Offline</span>';
+            else if (status === 'DANGER') actionEl.innerHTML = '<span class="text-red-500 font-bold">Power Cut</span>';
+            else if (status === 'WARNING') actionEl.innerHTML = '<span class="text-yellow-500">Approaching Limit</span>';
+            else actionEl.innerHTML = '<span class="text-green-500">Monitoring</span>';
+
+            // 4. Update Warning Box
+            const warningBox = document.getElementById('warning-box');
+            if (status === 'DANGER' && connected) {
+                warningBox.classList.remove('hidden');
+                document.getElementById('warning-time').innerText = timeOnly;
+                document.getElementById('card-status').classList.add('danger-pulse');
+            } else {
+                warningBox.classList.add('hidden');
+                document.getElementById('card-status').classList.remove('danger-pulse');
+            }
+
+            // 5. Update Chart
+            tempChart.data.labels.push(timeOnly);
+            tempChart.data.datasets[0].data.push(temperature ?? null);
+            tempChart.data.datasets[1].data.push(humidity ?? null); 
+            
+            // Future prediction (smoothed)
+            if (dataHistory.length >= 10 && connected) {
+                let current = dataHistory[dataHistory.length - 1].temperature;
+                let past = dataHistory[dataHistory.length - 10].temperature;
+
+                if (current !== null && past !== null) {
+                    let rate = (current - past) / 10;
+                    let futureTemp = current + rate * 20;
+
+                    if (lastPrediction !== null) {
+                        futureTemp = (futureTemp * 0.4) + (lastPrediction * 0.6);
+                    }
+                    lastPrediction = futureTemp;
+                    tempChart.data.datasets[2].data.push(futureTemp);
+                } else {
+                    tempChart.data.datasets[2].data.push(null);
+                }
+            } else {
+                tempChart.data.datasets[2].data.push(null);
+            }
+            
+            if(status === 'DANGER') {
+                tempChart.data.datasets[0].borderColor = '#ef4444'; 
+                tempChart.data.datasets[0].backgroundColor = 'rgba(239, 68, 68, 0.2)';
+            } else if (status === 'WARNING') {
+                tempChart.data.datasets[0].borderColor = '#f59e0b'; 
+                tempChart.data.datasets[0].backgroundColor = 'rgba(245, 158, 11, 0.2)';
+            } else {
+                tempChart.data.datasets[0].borderColor = '#ff7aa8'; 
+                tempChart.data.datasets[0].backgroundColor = 'rgba(255,122,168,0.2)';
+            }
+
+            if (tempChart.data.labels.length > MAX_GRAPH_POINTS) {
+                tempChart.data.labels.shift();
+                tempChart.data.datasets[0].data.shift();
+                tempChart.data.datasets[1].data.shift(); 
+                tempChart.data.datasets[2].data.shift(); 
+            }
+            tempChart.update();
+
+            // 6. Update Table
+            updateTableUI();
+
+            // 7. Calculate and Update Metrics
+            if (temperature !== null && temperature !== undefined) updateMetrics(temperature);
+        }
+
+        // --- UI HELPER FUNCTIONS ---
+        function updateTableUI() {
+            const tbody = document.getElementById('log-table-body');
+            tbody.innerHTML = ''; 
+            
+            tableData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-white/5 transition-colors';
+                
+                let statusBadge = '';
+                if(row.status === 'NORMAL') statusBadge = '<span class="bg-green-500/20 text-green-400 px-2 py-1 rounded text-xs font-bold">NORMAL</span>';
+                if(row.status === 'WARNING') statusBadge = '<span class="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded text-xs font-bold">WARNING</span>';
+                if(row.status === 'DANGER') statusBadge = '<span class="bg-red-500/20 text-red-400 px-2 py-1 rounded text-xs font-bold">DANGER</span>';
+                if(row.connected === false || row.status === 'OFFLINE') statusBadge = '<span class="bg-gray-500/20 text-gray-400 px-2 py-1 rounded text-xs font-bold">OFFLINE</span>';
+                
+                let relayBadge = row.connected === false ? '--' : (row.relay === 1 
+                    ? '<span class="text-green-400"><i class="fa-solid fa-bolt mr-1"></i>ON</span>' 
+                    : '<span class="text-red-400"><i class="fa-solid fa-power-off mr-1"></i>OFF</span>');
+
+                let timeStr = row.timestamp ? row.timestamp.split(' ')[1] : "--:--:--";
+                let tempStr = (row.temperature !== undefined && row.temperature !== null) ? row.temperature.toFixed(1) + '°C' : '--';
+
+                tr.innerHTML = `
+                    <td class="p-3 font-mono text-gray-400">${timeStr}</td>
+                    <td class="p-3 font-bold">${tempStr}</td>
+                    <td class="p-3">${relayBadge}</td>
+                    <td class="p-3">${statusBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateMetrics(temp) {
+            sessionCount++;
+            sessionSum += temp;
+            if (temp > sessionMax) sessionMax = temp;
+            if (temp < sessionMin) sessionMin = temp;
+            
+            document.getElementById('metric-max').innerText = sessionMax.toFixed(1) + ' °C';
+            document.getElementById('metric-min').innerText = sessionMin.toFixed(1) + ' °C';
+            document.getElementById('metric-avg').innerText = (sessionSum / sessionCount).toFixed(1) + ' °C';
+        }
+
+        // --- CSV EXPORT FEATURE ---
+        function downloadCSV() {
+            if(dataHistory.length === 0) {
+                showModal("Export Failed", "No data to download yet! Let the simulation run for a few seconds.");
+                return;
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "timestamp,temperature,humidity,heatindex,relay,status\n"; 
+            
+            dataHistory.forEach(row => {
+                let hum = (row.humidity !== undefined && row.humidity !== null) ? row.humidity.toFixed(1) : '';
+                let temp = (row.temperature !== undefined && row.temperature !== null) ? row.temperature.toFixed(1) : '';
+                let hi = (row.heatindex !== undefined && row.heatindex !== null) ? row.heatindex.toFixed(1) : '';
+                let rowString = `${row.timestamp},${temp},${hum},${hi},${row.relay},${row.status}`;
+                csvContent += rowString + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "simulated_temperature_log.csv");
+            document.body.appendChild(link); 
+            link.click();
+            document.body.removeChild(link); 
+        }
+
+        // --- START INTERVAL ---
+        setInterval(fetchAndUpdateData, 1000);
+        fetchAndUpdateData();
+
+    </script>
+</body>
+</html>
